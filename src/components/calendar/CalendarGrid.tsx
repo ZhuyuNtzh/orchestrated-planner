@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, parseISO, addMinutes, isWithinInterval, areIntervalsOverlapping } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, parseISO, addMinutes, isWithinInterval, areIntervalsOverlapping, differenceInMinutes } from "date-fns";
 import { useCalendar } from "@/context/CalendarContext";
 import { EventItem } from "./EventItem";
 import { EventForm } from "./EventForm";
@@ -51,47 +51,80 @@ export function CalendarGrid() {
     // Sort events by start time and duration
     const sortedEvents = sortEvents(events);
     
-    // Track concurrent events
-    const eventLayout: { event: CalendarEvent; column: number; totalColumns: number }[] = [];
-    const columns: { end: Date }[] = [];
+    // Group events that overlap each other
+    const eventGroups: CalendarEvent[][] = [];
     
     for (const event of sortedEvents) {
-      // Find an available column
-      let columnIndex = 0;
-      for (let i = 0; i < columns.length; i++) {
-        if (event.start >= columns[i].end) {
-          columnIndex = i;
-          columns[i] = { end: event.end };
+      // Check if this event overlaps with any existing group
+      let addedToGroup = false;
+      
+      for (const group of eventGroups) {
+        // Check if event overlaps with any event in this group
+        const overlapsWithGroup = group.some(groupEvent => 
+          areIntervalsOverlapping(
+            { start: event.start, end: event.end },
+            { start: groupEvent.start, end: groupEvent.end }
+          )
+        );
+        
+        if (overlapsWithGroup) {
+          group.push(event);
+          addedToGroup = true;
           break;
         }
       }
       
-      // If no column is available, add a new one
-      if (columnIndex === columns.length) {
-        columns.push({ end: event.end });
+      // If event doesn't overlap with any existing group, create a new group
+      if (!addedToGroup) {
+        eventGroups.push([event]);
+      }
+    }
+    
+    // Calculate layout for each group
+    const eventLayout: { event: CalendarEvent; column: number; totalColumns: number }[] = [];
+    
+    for (const group of eventGroups) {
+      // For each group, distribute events horizontally
+      const columns: CalendarEvent[][] = [[]];
+      
+      for (const event of group) {
+        // Find the first column where the event doesn't overlap
+        let columnIndex = 0;
+        let placed = false;
+        
+        while (!placed && columnIndex < columns.length) {
+          const column = columns[columnIndex];
+          const overlaps = column.some(columnEvent => 
+            areIntervalsOverlapping(
+              { start: event.start, end: event.end },
+              { start: columnEvent.start, end: columnEvent.end }
+            )
+          );
+          
+          if (!overlaps) {
+            column.push(event);
+            placed = true;
+          } else {
+            columnIndex++;
+          }
+        }
+        
+        // If event couldn't be placed in any existing column, create a new one
+        if (!placed) {
+          columns.push([event]);
+        }
       }
       
-      // Calculate overlapping events to determine totalColumns
-      const overlappingEvents = sortedEvents.filter(otherEvent => 
-        event !== otherEvent && areIntervalsOverlapping(
-          { start: event.start, end: event.end },
-          { start: otherEvent.start, end: otherEvent.end }
-        )
-      );
-      
-      // The total columns is the maximum column index of overlapping events + 1
-      const maxOverlappingColumns = overlappingEvents.length > 0 
-        ? Math.max(columnIndex, ...overlappingEvents.map(e => {
-          const layout = eventLayout.find(l => l.event === e);
-          return layout ? layout.column : 0;
-        })) + 1
-        : columnIndex + 1;
-      
-      eventLayout.push({
-        event,
-        column: columnIndex,
-        totalColumns: Math.max(maxOverlappingColumns, columns.length)
-      });
+      // Add events from this group to the layout
+      for (let i = 0; i < columns.length; i++) {
+        for (const event of columns[i]) {
+          eventLayout.push({
+            event,
+            column: i,
+            totalColumns: columns.length
+          });
+        }
+      }
     }
     
     return eventLayout;
@@ -119,13 +152,6 @@ export function CalendarGrid() {
             const nextHourDate = new Date(hourDate);
             nextHourDate.setHours(hour + 1);
             
-            // Get events that overlap with this hour
-            const hourEvents = eventLayout.filter(({ event }) => {
-              return isWithinInterval(hourDate, { start: event.start, end: event.end }) || 
-                     isWithinInterval(nextHourDate, { start: event.start, end: event.end }) ||
-                     (event.start <= hourDate && event.end >= nextHourDate);
-            });
-            
             return (
               <div
                 key={hour}
@@ -139,51 +165,43 @@ export function CalendarGrid() {
                 <div className="absolute left-0 top-0 w-16 text-xs font-medium text-muted-foreground p-1">
                   {format(hourDate, "h a")}
                 </div>
-                <div className="ml-16 space-y-1 relative">
-                  {hourEvents.map(({ event, column, totalColumns }) => {
-                    // Calculate event height based on duration
-                    const startMinute = event.start.getHours() * 60 + event.start.getMinutes();
-                    const endMinute = event.end.getHours() * 60 + event.end.getMinutes();
-                    const hourMinute = hour * 60;
-                    const nextHourMinute = (hour + 1) * 60;
-                    
-                    // Calculate top position (relative to this hour)
-                    const top = Math.max(0, startMinute - hourMinute);
-                    
-                    // Calculate height (capped to this hour slot)
-                    const height = Math.min(60, endMinute - startMinute);
-                    
-                    // Only render if the event starts in this hour or continues from previous hour
-                    if (startMinute < nextHourMinute && endMinute > hourMinute) {
-                      return (
-                        <div 
-                          key={event.id} 
-                          className="absolute"
-                          style={{
-                            top: `${(top / 60) * 100}%`,
-                            height: `${(height / 60) * 100}%`,
-                            left: `${(column / totalColumns) * 100}%`,
-                            width: `${(1 / totalColumns) * 100}%`,
-                          }}
-                        >
-                          <EventItem
-                            event={event}
-                            onClick={handleEventClick}
-                            view="day"
-                            style={{
-                              height: '100%',
-                              margin: '0 1px',
-                            }}
-                          />
-                        </div>
-                      );
-                    }
-                    return null;
-                  })}
+                <div className="ml-16 space-y-1 relative h-full">
+                  {/* No event rendering here - all events will be positioned absolutely within the entire day view */}
                 </div>
               </div>
             );
           })}
+          
+          {/* Render all events with absolute positioning across the entire day container */}
+          <div className="absolute top-0 left-16 right-0 bottom-0 pointer-events-none">
+            {eventLayout.map(({ event, column, totalColumns }) => {
+              // Calculate event position and dimensions
+              const dayStartMinutes = dayStart.getHours() * 60;
+              const eventStartMinutes = event.start.getHours() * 60 + event.start.getMinutes();
+              const eventEndMinutes = event.end.getHours() * 60 + event.end.getMinutes();
+              const eventDurationMinutes = eventEndMinutes - eventStartMinutes;
+              
+              // Convert to percentages for positioning
+              const top = ((eventStartMinutes - dayStartMinutes) / (24 * 60)) * 100;
+              const height = (eventDurationMinutes / (24 * 60)) * 100;
+              
+              return (
+                <EventItem
+                  key={event.id}
+                  event={event}
+                  onClick={handleEventClick}
+                  view="day"
+                  style={{
+                    top: `${top}%`,
+                    height: `${height}%`,
+                    left: `${(column / totalColumns) * 100}%`,
+                    width: `${(1 / totalColumns) * 100}%`,
+                    pointerEvents: 'auto',
+                  }}
+                />
+              );
+            })}
+          </div>
         </div>
       </div>
     );
@@ -235,77 +253,70 @@ export function CalendarGrid() {
                 {format(new Date().setHours(hour), "h a")}
               </div>
               
-              {weekDays.map((day, dayIndex) => {
-                const hourDate = new Date(day);
-                hourDate.setHours(hour);
-                const nextHourDate = new Date(hourDate);
-                nextHourDate.setHours(hour + 1);
-                
-                // Get events that overlap with this hour for this day
-                const hourEvents = eventsByDay[dayIndex].filter(({ event }) => {
-                  return isWithinInterval(hourDate, { start: event.start, end: event.end }) || 
-                         isWithinInterval(nextHourDate, { start: event.start, end: event.end }) ||
-                         (event.start <= hourDate && event.end >= nextHourDate);
-                });
-                
-                return (
-                  <div
-                    key={dayIndex}
-                    className={cn(
-                      "min-h-[60px] p-1 relative",
-                      dayIndex === 0 && "pl-16"
-                    )}
-                    onClick={() => {
-                      const clickDate = new Date(day);
-                      clickDate.setHours(hour);
-                      handleDayClick(clickDate);
-                    }}
-                  >
-                    {hourEvents.map(({ event, column, totalColumns }) => {
-                      // Calculate event height based on duration
-                      const startMinute = event.start.getHours() * 60 + event.start.getMinutes();
-                      const endMinute = event.end.getHours() * 60 + event.end.getMinutes();
-                      const hourMinute = hour * 60;
-                      const nextHourMinute = (hour + 1) * 60;
-                      
-                      // Calculate top position (relative to this hour)
-                      const top = Math.max(0, startMinute - hourMinute);
-                      
-                      // Calculate height (capped to this hour slot)
-                      const height = Math.min(60, endMinute - hourMinute);
-                      
-                      // Only render if the event starts in this hour or continues from previous hour
-                      if (startMinute < nextHourMinute && endMinute > hourMinute) {
-                        return (
-                          <div 
-                            key={event.id} 
-                            className="absolute"
-                            style={{
-                              top: `${(top / 60) * 100}%`,
-                              height: `${(height / 60) * 100}%`,
-                              left: `${(column / totalColumns) * 100}%`,
-                              width: `${(1 / totalColumns) * 100}%`,
-                            }}
-                          >
-                            <EventItem
-                              event={event}
-                              onClick={handleEventClick}
-                              view="week"
-                              style={{
-                                height: '100%',
-                                margin: '0 1px',
-                              }}
-                            />
-                          </div>
-                        );
-                      }
-                      return null;
-                    })}
-                  </div>
-                );
-              })}
+              {weekDays.map((day, dayIndex) => (
+                <div
+                  key={dayIndex}
+                  className={cn(
+                    "min-h-[60px] p-1 relative",
+                    dayIndex === 0 && "pl-16"
+                  )}
+                  onClick={() => {
+                    const clickDate = new Date(day);
+                    clickDate.setHours(hour);
+                    handleDayClick(clickDate);
+                  }}
+                >
+                  {/* We'll place events absolutely in the day container */}
+                </div>
+              ))}
             </div>
           ))}
+          
+          {/* Render events with absolute positioning per day column */}
+          {weekDays.map((day, dayIndex) => {
+            const dayStart = new Date(day);
+            dayStart.setHours(0, 0, 0, 0);
+            
+            return (
+              <div 
+                key={dayIndex} 
+                className="absolute top-0 bottom-0 pointer-events-none"
+                style={{
+                  left: dayIndex === 0 ? '16px' : `calc(${dayIndex} * (100% / 7))`,
+                  width: dayIndex === 0 ? `calc((100% / 7) - 16px)` : `calc(100% / 7)`,
+                }}
+              >
+                {eventsByDay[dayIndex].map(({ event, column, totalColumns }) => {
+                  // Calculate event position and dimensions
+                  const dayStartMinutes = dayStart.getHours() * 60;
+                  const eventStartMinutes = event.start.getHours() * 60 + event.start.getMinutes();
+                  const eventEndMinutes = event.end.getHours() * 60 + event.end.getMinutes();
+                  const eventDurationMinutes = eventEndMinutes - eventStartMinutes;
+                  
+                  // Convert to percentages for positioning
+                  const top = ((eventStartMinutes - dayStartMinutes) / (24 * 60)) * 100;
+                  const height = (eventDurationMinutes / (24 * 60)) * 100;
+                  
+                  return (
+                    <EventItem
+                      key={event.id}
+                      event={event}
+                      onClick={handleEventClick}
+                      view="week"
+                      style={{
+                        top: `${top}%`,
+                        height: `${height}%`,
+                        left: `${(column / totalColumns) * 100}%`,
+                        width: `${(1 / totalColumns) * 100}%`,
+                        pointerEvents: 'auto',
+                        margin: '0 1px',
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -361,19 +372,34 @@ export function CalendarGrid() {
                 </span>
               )}
             </div>
-            <div className="overflow-y-auto max-h-[100px] space-y-1">
-              {eventLayout.map(({ event, column, totalColumns }) => (
-                <EventItem
-                  key={event.id}
-                  event={event}
-                  onClick={handleEventClick}
-                  view="month"
-                  style={{
-                    width: `${100 / totalColumns}%`,
-                    marginLeft: `${(column / totalColumns) * 100}%`,
-                  }}
-                />
-              ))}
+            <div className="overflow-y-auto max-h-[100px] space-y-1 relative">
+              {eventLayout.map(({ event, column, totalColumns }) => {
+                // Calculate height based on event duration
+                const eventDuration = differenceInMinutes(event.end, event.start);
+                const dayMinutes = 24 * 60;
+                
+                // Minimum height for visibility, scale the rest proportionally
+                const minHeight = 24; // minimum height in pixels
+                const maxAvailableHeight = 100 - 8; // max container height minus padding
+                
+                // Calculate a proportional height based on duration relative to a day
+                // but make sure it's at least the minimum
+                const heightPercentage = Math.max(minHeight, (eventDuration / dayMinutes) * maxAvailableHeight);
+                
+                return (
+                  <EventItem
+                    key={event.id}
+                    event={event}
+                    onClick={handleEventClick}
+                    view="month"
+                    style={{
+                      width: `${100 / totalColumns}%`,
+                      marginLeft: `${(column / totalColumns) * 100}%`,
+                      height: `${heightPercentage}px`,
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
         );

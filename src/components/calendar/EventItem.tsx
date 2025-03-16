@@ -34,8 +34,8 @@ export function EventItem({ event, onClick, view, style }: EventItemProps) {
       onClick={handleClick}
       className={cn(
         "calendar-event group text-white rounded-sm p-1 overflow-hidden text-ellipsis",
-        view === "month" && "text-xs h-6",
-        (view === "day" || view === "week") && "h-full"
+        view === "month" ? "text-xs" : "",  // Removed fixed height for month view
+        (view === "day" || view === "week") && "absolute" // Added absolute positioning for day/week
       )}
       style={getEventStyles()}
     >
