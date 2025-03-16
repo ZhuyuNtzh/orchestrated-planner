@@ -11,26 +11,32 @@ type AuthMode = "signIn" | "signUp";
 export function AuthForm() {
   const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<AuthMode>("signIn");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-    name: "",
-  });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === "email") {
+      setEmail(value);
+    } else if (name === "password") {
+      setPassword(value);
+    } else if (name === "name") {
+      setName(value);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.email || !formData.password) {
-      toast("Error", {
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
+    if (!email || !password) {
+      toast("Error: Please fill in all required fields.");
+      return;
+    }
+    
+    if (mode === "signUp" && password.length < 6) {
+      toast("Error: Password must be at least 6 characters long.");
       return;
     }
     
@@ -38,20 +44,19 @@ export function AuthForm() {
       setIsLoading(true);
       
       if (mode === "signIn") {
-        await signIn(formData.email, formData.password);
+        await signIn(email, password);
       } else {
-        await signUp(formData.email, formData.password, formData.name || undefined);
+        await signUp(email, password, name || undefined);
       }
     } catch (error) {
-      // Error is already handled in auth context
-      console.error(error);
+      console.error("Authentication error:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
   const toggleMode = () => {
-    setMode(mode === "signIn" ? "signUp" : "signIn");
+    setMode(prevMode => (prevMode === "signIn" ? "signUp" : "signIn"));
   };
 
   return (
@@ -75,7 +80,7 @@ export function AuthForm() {
                 id="name"
                 name="name"
                 placeholder="John Doe"
-                value={formData.name}
+                value={name}
                 onChange={handleChange}
                 className="form-control"
               />
@@ -88,7 +93,7 @@ export function AuthForm() {
               name="email"
               type="email"
               placeholder="example@mail.com"
-              value={formData.email}
+              value={email}
               onChange={handleChange}
               required
               className="form-control"
@@ -101,7 +106,7 @@ export function AuthForm() {
               name="password"
               type="password"
               placeholder="••••••••"
-              value={formData.password}
+              value={password}
               onChange={handleChange}
               required
               className="form-control"

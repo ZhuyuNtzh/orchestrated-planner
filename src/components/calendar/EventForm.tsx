@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,10 +77,7 @@ export function EventForm({ isOpen, onClose, event, defaultDate }: EventFormProp
     e.preventDefault();
     
     if (!formData.title || !formData.start || !formData.end) {
-      toast("Error", {
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
+      toast("Error: Please fill in all required fields.");
       return;
     }
     
@@ -89,10 +85,7 @@ export function EventForm({ isOpen, onClose, event, defaultDate }: EventFormProp
     const endDate = new Date(formData.end);
     
     if (endDate <= startDate) {
-      toast("Error", {
-        description: "End time must be after start time.",
-        variant: "destructive",
-      });
+      toast("Error: End time must be after start time.");
       return;
     }
     
@@ -116,10 +109,7 @@ export function EventForm({ isOpen, onClose, event, defaultDate }: EventFormProp
       onClose();
     } catch (error) {
       console.error("Error saving event:", error);
-      toast("Error", {
-        description: "There was a problem saving your event.",
-        variant: "destructive",
-      });
+      toast("Error: There was a problem saving your event.");
     } finally {
       setIsLoading(false);
     }
@@ -134,10 +124,7 @@ export function EventForm({ isOpen, onClose, event, defaultDate }: EventFormProp
       onClose();
     } catch (error) {
       console.error("Error deleting event:", error);
-      toast("Error", {
-        description: "There was a problem deleting your event.",
-        variant: "destructive",
-      });
+      toast("Error: There was a problem deleting your event.");
     } finally {
       setIsLoading(false);
     }

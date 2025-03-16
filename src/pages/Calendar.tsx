@@ -24,9 +24,7 @@ export default function Calendar() {
     if (eventElement) {
       eventElement.click();
     } else {
-      toast("Create Event", {
-        description: "Please select a date on the calendar to create an event.",
-      });
+      toast("Please select a date on the calendar to create an event.");
     }
   };
   

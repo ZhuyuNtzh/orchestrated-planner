@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { CalendarContextType, CalendarView, CalendarEvent } from '@/types';
 import { useAuth } from './AuthContext';
@@ -74,10 +75,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
 
   const addEvent = async (eventData: Omit<CalendarEvent, 'id' | 'userId'>): Promise<void> => {
     if (!user) {
-      toast('Error', {
-        description: 'You must be logged in to add events',
-        variant: 'destructive',
-      });
+      toast('Error: You must be logged in to add events');
       return;
     }
     
@@ -89,9 +87,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
     
     setEvents(prev => [...prev, newEvent]);
     
-    toast('Event Added', {
-      description: 'Your event has been added to the calendar.',
-    });
+    toast('Event Added: Your event has been added to the calendar.');
   };
 
   const updateEvent = async (id: string, eventData: Partial<Omit<CalendarEvent, 'id' | 'userId'>>): Promise<void> => {
@@ -102,17 +98,13 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
       return event;
     }));
     
-    toast('Event Updated', {
-      description: 'Your event has been updated.',
-    });
+    toast('Event Updated: Your event has been updated.');
   };
 
   const deleteEvent = async (id: string): Promise<void> => {
     setEvents(prev => prev.filter(event => event.id !== id));
     
-    toast('Event Deleted', {
-      description: 'Your event has been removed from the calendar.',
-    });
+    toast('Event Deleted: Your event has been removed from the calendar.');
   };
 
   const value: CalendarContextType = {
