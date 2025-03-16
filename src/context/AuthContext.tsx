@@ -1,7 +1,6 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { AuthContextType, User, AuthStatus } from '@/types';
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 
 // Mock data store for users
 const USERS_STORAGE_KEY = 'calendar_users';

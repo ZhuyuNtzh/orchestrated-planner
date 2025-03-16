@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { CalendarEvent } from "@/types";
 import { useCalendar } from "@/context/CalendarContext";
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { format } from "date-fns";
 
 interface EventFormProps {

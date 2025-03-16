@@ -3,7 +3,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { CalendarView } from "@/types";
 
-interface ViewToggleProps extends React.HTMLAttributes<HTMLDivElement> {
+interface ViewToggleProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onChange'> {
   views: { value: CalendarView; label: string }[];
   value: CalendarView;
   onChange: (view: CalendarView) => void;

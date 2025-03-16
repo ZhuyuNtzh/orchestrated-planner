@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,7 @@ import { CalendarGrid } from "@/components/calendar/CalendarGrid";
 import { useAuth } from "@/context/AuthContext";
 import { CalendarProvider } from "@/context/CalendarContext";
 import { UserCircle, PlusCircle, LogOut } from "lucide-react";
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 
 export default function Calendar() {
   const { user, status, signOut } = useAuth();

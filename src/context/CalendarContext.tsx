@@ -1,11 +1,9 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { CalendarContextType, CalendarView, CalendarEvent } from '@/types';
 import { useAuth } from './AuthContext';
 import { addDays, addMonths, addWeeks, startOfDay, startOfMonth, startOfWeek } from 'date-fns';
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 
-// Initialize empty calendar context
 const CalendarContext = createContext<CalendarContextType | undefined>(undefined);
 
 export function CalendarProvider({ children }: { children: ReactNode }) {
@@ -14,10 +12,8 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<CalendarView>('month');
   const [date, setDate] = useState<Date>(new Date());
 
-  // Storage key includes user ID to isolate user data
   const getEventsStorageKey = () => `calendar_events_${user?.id || 'guest'}`;
 
-  // Load events from storage on mount and when user changes
   useEffect(() => {
     if (!user) {
       setEvents([]);
@@ -29,7 +25,6 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
     if (storedEvents) {
       try {
         const parsedEvents = JSON.parse(storedEvents) as CalendarEvent[];
-        // Convert string dates back to Date objects
         const eventsWithDates = parsedEvents.map(event => ({
           ...event,
           start: new Date(event.start),
@@ -43,14 +38,12 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  // Save events to storage whenever they change
   useEffect(() => {
     if (user) {
       localStorage.setItem(getEventsStorageKey(), JSON.stringify(events));
     }
   }, [events, user]);
 
-  // Calendar navigation methods
   const navigateToDate = (newDate: Date) => {
     setDate(newDate);
   };
@@ -79,7 +72,6 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Event management methods
   const addEvent = async (eventData: Omit<CalendarEvent, 'id' | 'userId'>): Promise<void> => {
     if (!user) {
       toast('Error', {
