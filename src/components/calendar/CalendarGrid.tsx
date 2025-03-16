@@ -136,26 +136,27 @@ export function CalendarGrid() {
     
     const hours = Array.from({ length: 24 }, (_, i) => i);
     
+    // Get events for the current day
     const dayEvents = events.filter(event => {
       const eventDate = new Date(event.start);
       return isSameDay(eventDate, date);
     });
     
+    // Calculate event positions
     const eventLayout = calculateEventLayout(dayEvents);
     
     return (
-      <div className="calendar-body h-[calc(100vh-12rem)] overflow-y-auto">
-        <div className="grid grid-cols-1 gap-1">
+      <div className="calendar-body h-[calc(100vh-12rem)] overflow-y-auto relative">
+        <div className="grid grid-cols-1 gap-0 relative">
+          {/* Time slots */}
           {hours.map(hour => {
             const hourDate = new Date(dayStart);
             hourDate.setHours(hour);
-            const nextHourDate = new Date(hourDate);
-            nextHourDate.setHours(hour + 1);
             
             return (
               <div
                 key={hour}
-                className="relative min-h-[60px] border-t border-border p-1"
+                className="relative min-h-[60px] border-t border-border py-1"
                 onClick={() => {
                   const clickDate = new Date(date);
                   clickDate.setHours(hour);
@@ -165,25 +166,35 @@ export function CalendarGrid() {
                 <div className="absolute left-0 top-0 w-16 text-xs font-medium text-muted-foreground p-1">
                   {format(hourDate, "h a")}
                 </div>
-                <div className="ml-16 space-y-1 relative h-full">
-                  {/* No event rendering here - all events will be positioned absolutely within the entire day view */}
-                </div>
+                <div className="ml-16 h-full"></div>
               </div>
             );
           })}
           
-          {/* Render all events with absolute positioning across the entire day container */}
+          {/* Events container with absolute positioning */}
           <div className="absolute top-0 left-16 right-0 bottom-0 pointer-events-none">
             {eventLayout.map(({ event, column, totalColumns }) => {
-              // Calculate event position and dimensions
-              const dayStartMinutes = dayStart.getHours() * 60;
-              const eventStartMinutes = event.start.getHours() * 60 + event.start.getMinutes();
-              const eventEndMinutes = event.end.getHours() * 60 + event.end.getMinutes();
-              const eventDurationMinutes = eventEndMinutes - eventStartMinutes;
+              // Calculate position based on start time and duration
+              const dayStartTime = dayStart.getTime();
+              const dayEndTime = new Date(dayStart).setHours(24, 0, 0, 0);
+              const totalDayMinutes = 24 * 60;
               
-              // Convert to percentages for positioning
-              const top = ((eventStartMinutes - dayStartMinutes) / (24 * 60)) * 100;
-              const height = (eventDurationMinutes / (24 * 60)) * 100;
+              // Get event start/end times and calculate percentages
+              const eventStartTime = event.start.getTime();
+              const eventEndTime = event.end.getTime();
+              
+              // Calculate top position (% from top of day)
+              const startMinutesSinceDayStart = (eventStartTime - dayStartTime) / (1000 * 60);
+              const topPercentage = (startMinutesSinceDayStart / totalDayMinutes) * 100;
+              
+              // Calculate height (% of day duration)
+              const eventDurationMinutes = (eventEndTime - eventStartTime) / (1000 * 60);
+              const heightPercentage = (eventDurationMinutes / totalDayMinutes) * 100;
+              
+              // Calculate width based on column position
+              const colWidth = 100 / totalColumns;
+              const leftPercentage = (column * colWidth);
+              const widthPercentage = colWidth;
               
               return (
                 <EventItem
@@ -192,11 +203,12 @@ export function CalendarGrid() {
                   onClick={handleEventClick}
                   view="day"
                   style={{
-                    top: `${top}%`,
-                    height: `${height}%`,
-                    left: `${(column / totalColumns) * 100}%`,
-                    width: `${(1 / totalColumns) * 100}%`,
+                    top: `${topPercentage}%`,
+                    height: `${heightPercentage}%`,
+                    left: `${leftPercentage}%`,
+                    width: `${widthPercentage}%`,
                     pointerEvents: 'auto',
+                    zIndex: 10,
                   }}
                 />
               );
